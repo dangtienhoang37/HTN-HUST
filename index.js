@@ -29,6 +29,19 @@ mqttClient.on('connect', () => {
     }
   });
 });
+// function push message 
+async function pushMessage(topic, message) {
+    mqttClient.publish(topic, message, (err) => {
+    if (err) {
+        console.error('Gửi tin nhắn thất bại', err);
+    } else {
+        console.log(`Đã gửi tin nhắn "${message}" lên chủ đề "${topic}"`);
+    }
+
+
+});
+}
+
 //random id theo timestamp
 function generateRandomId() {
   const timestamp = new Date().getTime();
@@ -159,6 +172,42 @@ function getRegPlateById(id) {
   });
 }
 
+// query xem có tồn tại id không 
+//Kiểm tra ID trong cơ sở dữ liệu MySQL
+const ValidID = async (idt) => {
+  const selectQuery = `SELECT * FROM card WHERE ID = '${idt}'`;
+
+  try {
+    const results = await new Promise((resolve, reject) => {
+      mysqlConnection.query(selectQuery, (err, results) => {
+        if (err) {
+          // console.log("the khong hop le!");
+          // pushMessage("Hust/htn/test", "0");
+
+          reject(err);
+        } else {
+          resolve(results);
+        }
+      });
+    });
+
+    if (results.length > 0) {
+      console.log("the hop le!");
+      // gui messgae ve esp
+
+      return true;
+    } else {
+      console.log("the khong hop le!");
+          pushMessage("Hust/htn/test", "0");
+
+      return false;
+    }
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
+};
+
 
 //lắng nghe message từ topic Bắt đầu :()
 mqttClient.on('message', async (topic, message) => {
@@ -167,13 +216,35 @@ mqttClient.on('message', async (topic, message) => {
   const idt = data
   // const id = data.ID;
   const id = idt;
+  // let isValid = 1;
+  // if (!checkIDValidity()){
+  //   console.log("khone the vao");
+  // }
+  console.log(id);
+  const isValid = await ValidID(id);
+  // ValidID(id)
+  //   .then(() => {
+  //     isValid = 1;
+  //     console.log("pass step 1");
+      
+
+  //     // mqttClient.publish("Hust/htn/test", responseMessage);
+  //   })
+  //   .catch((err) => {
+  //     isValid = 0;
+  //     console.log("pass step 1");
+  //     console.error('card undefine:', err);
+  //     mqttClient.publish("Hust/htn/test", "the an cap");
+
+  //   })
+
 
   
   
 
   // Làm thêm 1 trường is Checkin. Check nếu isCheckin là true thì thực hiện query gửi xe, nếu checkout thì thực hiện query check out
-  // const isCheckin = data.isCheckin;
-  if(topic === mqttTopic){
+ 
+  if(topic === mqttTopic && isValid == true){
     // cần query xem cái id của thẻ có trong DB không. Có thì sẽ check field IsCheckin. Nếu isCheckin = false thì mới thực hiện check in
     // try để check status và bắt lỗi
     try {
@@ -245,11 +316,13 @@ mqttClient.on('message', async (topic, message) => {
                         }
                       });
                     }
-                    
+                      // tra ve la xe checkout thanh cong
+                      pushMessage("Hust/htn/test", "5");
                       console.log("Vehical: " + regPlate + " checkout Sucessfully!")
                   }
                   else{
                     // tra ve cho esp la bien so ko khop
+                    pushMessage("Hust/htn/test", "2");
                     console.log("checkout fail!");
                     console.log("registration plate no matching");
                   }
@@ -310,6 +383,8 @@ mqttClient.on('message', async (topic, message) => {
                }
              });
              // GỬI DATA ĐÃ THÀNH CÔNG VỀ CHO CLIENT
+              pushMessage("Hust/htn/test", "1")
+
  
  
              
@@ -319,8 +394,10 @@ mqttClient.on('message', async (topic, message) => {
            })
            console.log(' PLEASE WAIT');
         } else {
-          console.log("not enough money!")
+          console.log("not enough money! try again...")
           // GỬI VỀ CHO CLIENT MESSAGE LÀ CHECK IN KHÔNG THÀNH CÔNG DO THIẾU MONEY
+          pushMessage("Hust/htn/test", "3")
+
         }
         
       }

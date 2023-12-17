@@ -1,43 +1,27 @@
-    // lấy checkin time
-    const CheckInTime = await getLatestCheckInTime(id);
-    console.log(CheckInTime);
-    // const currentTime = formattedTime;  
-    // lấy tg hiện tại
-    const currentTimeParsed = parseISO(formattedTime, 'yyyy-MM-dd HH:mm:ss', new Date());
-    console.log(currentTimeParsed);
-    // lấy tg chênh lệch
-    const hoursDifference = differenceInHours(currentTimeParsed, CheckInTime);
-    console.log(hoursDifference);
-    if(true) {
-      // update bảng history
-      const updateHistoryQuery = `UPDATE history SET TimeCheckOut = '${formattedTime}', Cash = ${(hoursDifference == 0) ? 10000 : hoursDifference* 1000} WHERE IdCard = ${id} AND TimeCheckOut IS NULL`;
 
-      mysqlConnection.query(updateHistoryQuery, (err, result) => {
-        if (err) {
-          console.error('Error updating data in history table:', err);
-        } else {
-          if (result.affectedRows > 0) {
-            console.log('Data updated in history table successfully.');
-            // Thực hiện các hành động khác nếu cần
-          } else {
-            console.log('No matching record found to update.');
-          }
-        }
-      });
+import { connect } from 'mqtt';
 
-      //update bảng card
-      const updateCardQuery = `UPDATE card SET IsCheckIn = 0 WHERE ID = ${id}`;
+const mqttClient = connect('mqtt://broker.emqx.io');
+const mqttTopic = "Hust/htn/test/esp"
 
-      mysqlConnection.query(updateCardQuery, (err, result) => {
-        if (err) {
-          console.error('Error updating data in card table:', err);
-        } else {
-          if (result.affectedRows > 0) {
-            console.log('Data updated in card table successfully.');
-            // Thực hiện các hành động khác nếu cần
-          } else {
-            console.log('No matching record found to update.');
-          }
-        }
-      });
+mqttClient.on('connect', () => {
+  console.log('Connected to MQTT broker!');
+  mqttClient.subscribe(mqttTopic, (err) => {
+    if (err) {
+      console.log(err);
     }
+  });
+});
+
+function pushMessage(topic, message) {
+  mqttClient.publish(topic, message, (err) => {
+    if (err) {
+      console.error('Gửi tin nhắn thất bại', err);
+    } else {
+      console.log(`Đã gửi tin nhắn "${message}" lên chủ đề "${topic}"`);
+    }
+
+  });
+}
+pushMessage("Hust/htn/test", "tien su may")
+console.log("pushed");
