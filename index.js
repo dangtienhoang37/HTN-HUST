@@ -10,8 +10,8 @@ import { differenceInHours, parseISO, parse } from 'date-fns';
 
 
 // Kết nối tới MQTT broker
-const mqttClient = connect('mqtt://test.mosquitto.org');
-const mqttTopic = "Hust/htn/test"
+const mqttClient = connect('mqtt://broker.emqx.io');
+const mqttTopic = "Hust/htn/test/esp"
 
 // Kết nối tới MySQL database
 const mysqlConnection = createConnection({
@@ -59,7 +59,7 @@ const pythonProgram = 'E:\\Smart_parking\\Server\\recognition_license_plate\\rea
 // query lấy money
 function getMoneyValue(id) {
   return new Promise((resolve, reject) => {
-    const selectMoneyQuery = `SELECT Money FROM card WHERE ID = ${id}`;
+    const selectMoneyQuery = `SELECT Money FROM card WHERE ID = '${id}'`;
 
     mysqlConnection.query(selectMoneyQuery, (err, results) => {
       if (err) {
@@ -68,7 +68,7 @@ function getMoneyValue(id) {
       } else {
         if (results.length > 0) {
           const moneyValue = results[0].Money;
-          console.log(`Money for ID ${id}: ${moneyValue}`);
+          console.log(`Money for ID '${id}': ${moneyValue}`);
           resolve(moneyValue);
         } else {
           console.log('No matching record found.');
@@ -80,9 +80,9 @@ function getMoneyValue(id) {
 }
 
 // query check thẻ 
-const checkCardStatus = (id) => {
+const checkCardStatus = (idt) => {
   return new Promise((resolve, reject) => {
-    const selectQuery = `SELECT * FROM card WHERE ID = ${id}`;
+    const selectQuery = `SELECT * FROM card WHERE ID = '${idt}'`;
 
     mysqlConnection.query(selectQuery, (err, results) => {
       if (err) {
@@ -106,7 +106,7 @@ function getLatestCheckInTime(id) {
       FROM (
         SELECT TimeCheckIn, ROW_NUMBER() OVER (PARTITION BY IdCard ORDER BY id DESC) as row_num
         FROM history
-        WHERE IdCard = ${id}
+        WHERE IdCard = '${id}'
       ) AS ranked
       WHERE row_num = 1
     `;
@@ -136,7 +136,7 @@ function getRegPlateById(id) {
     const selectRegPlateQuery = `
       SELECT RegPlate
       FROM history
-      WHERE IdCard = ${id}
+      WHERE IdCard = '${id}'
       ORDER BY id DESC
       LIMIT 1;
     `;
@@ -148,7 +148,7 @@ function getRegPlateById(id) {
       } else {
         if (results.length > 0) {
           const regPlate = results[0].RegPlate;
-          console.log(`RegPlate for IdCard ${id}: ${regPlate}`);
+          console.log(`RegPlate for IdCard '${id}': ${regPlate}`);
           resolve(regPlate);
         } else {
           console.log('No matching record found.');
@@ -162,8 +162,13 @@ function getRegPlateById(id) {
 
 //lắng nghe message từ topic Bắt đầu :()
 mqttClient.on('message', async (topic, message) => {
-  const data = JSON.parse(message.toString());
-  const id = data.ID;
+  const data = message.toString().trim();
+  // const data = JSON.parse(message.toString());
+  const idt = data
+  // const id = data.ID;
+  const id = idt;
+
+  
   
 
   // Làm thêm 1 trường is Checkin. Check nếu isCheckin là true thì thực hiện query gửi xe, nếu checkout thì thực hiện query check out
@@ -206,7 +211,7 @@ mqttClient.on('message', async (topic, message) => {
                     if(true) {
                       // update bảng history
                       const cash = (hoursDifference == 0) ? 10000 : hoursDifference* 1000;
-                      const updateHistoryQuery = `UPDATE history SET TimeCheckOut = '${formattedTime}', Cash = ${cash} WHERE IdCard = ${id} AND TimeCheckOut IS NULL`;
+                      const updateHistoryQuery = `UPDATE history SET TimeCheckOut = '${formattedTime}', Cash = ${cash} WHERE IdCard = '${id}' AND TimeCheckOut IS NULL`;
 
                       mysqlConnection.query(updateHistoryQuery, (err, result) => {
                         if (err) {
@@ -223,9 +228,9 @@ mqttClient.on('message', async (topic, message) => {
 
                       //update bảng card
                       const currentMoney = await getMoneyValue(id);
-                      console.log("currentM:" + currentMoney);
+                      console.log("currentMoney:" + currentMoney);
                       console.log("cash:" + cash);
-                      const updateCardQuery = `UPDATE card SET IsCheckIn = 0, Money = ${currentMoney-cash} WHERE ID = ${id}`;
+                      const updateCardQuery = `UPDATE card SET IsCheckIn = 0, Money = ${currentMoney-cash} WHERE ID = '${id}'`;
 
                       mysqlConnection.query(updateCardQuery, (err, result) => {
                         if (err) {
@@ -241,7 +246,7 @@ mqttClient.on('message', async (topic, message) => {
                       });
                     }
                     
-                   
+                      console.log("Vehical: " + regPlate + " checkout Sucessfully!")
                   }
                   else{
                     // tra ve cho esp la bien so ko khop
@@ -281,7 +286,7 @@ mqttClient.on('message', async (topic, message) => {
              
              // define update khi checkin
 
-             const updateQueryCard = `UPDATE card SET isCheckin = 1 WHERE ID = ${id}`; // update Card table
+             const updateQueryCard = `UPDATE card SET isCheckin = 1 WHERE ID = '${id}'`; // update Card table
              mysqlConnection.query(updateQueryCard, (err, result) => {
                if (err) {
                  console.error('Error updating card status:', err);
@@ -294,7 +299,7 @@ mqttClient.on('message', async (topic, message) => {
              // update history table
              // Thêm dữ liệu vào bảng history
              
-             const insertHistoryQuery = `INSERT INTO history (id, IdCard, TimeCheckIn, TimeCheckOut, RegPlate, Cash) VALUES (${generateRandomId()}, ${id}, '${formattedTime}', ${"null"}, '${outputData}', ${0})`;
+             const insertHistoryQuery = `INSERT INTO history (id, IdCard, TimeCheckIn, TimeCheckOut, RegPlate, Cash) VALUES (${generateRandomId()}, '${id}', '${formattedTime}', ${"null"}, '${outputData}', ${0})`;
  
              mysqlConnection.query(insertHistoryQuery, (err, result) => {
                if (err) {
